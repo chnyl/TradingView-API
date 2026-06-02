@@ -96,6 +96,8 @@ function subscribeSymbol(symbolId, wsClient) {
     });
 
     chart.onUpdate(() => {
+      if (!activeSymbols[symbolId]) return;
+
       const periods = chart.periods;
       if (!periods || !periods[0]) return;
 
