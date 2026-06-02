@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto Live Terminal | TradingView API</title>
+  <meta name="description" content="A compact, real-time cryptocurrency dashboard with custom watches and interactive charts." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── CSS VARIABLES & DARK MODE DESIGN SYSTEM ────────────────────────── */
+    :root {
+      --bg-deep:       #06080f;
+      --bg-surface:    #0a0e1a;
+      --bg-surface-2:  #111625;
+      --border:        rgba(255, 255, 255, 0.05);
+      --border-active: rgba(99, 102, 241, 0.4);
+      --text-main:     #f8fafc;
+      --text-sub:      #94a3b8;
+      --text-muted:    #475569;
+      --green:         #10b981;
+      --green-glow:    rgba(16, 185, 129, 0.15);
+      --red:           #f43f5e;
+      --red-glow:      rgba(244, 63, 94, 0.15);
+      --accent:        #6366f1;
+      --accent-glow:   rgba(99, 102, 241, 0.2);
+      --font-mono:     'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-deep);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────────────────────── */
+    header {
+      height: 56px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background-color: var(--bg-surface);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-icon {
+      font-size: 20px;
+      background: linear-gradient(135deg, var(--accent), #10b981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-sub);
+      font-weight: 400;
+    }
+
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 12px;
+    }
+    #ws-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: rgba(255, 255, 255, 0.03);
+      padding: 4px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+    }
+    .status-dot.online {
+      background-color: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+    .status-dot.offline {
+      background-color: var(--red);
+    }
+    #ws-status-text {
+      font-weight: 500;
+      font-size: 11px;
+    }
+
+    /* ── MAIN LAYOUT ─────────────────────────────────────────────────────── */
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── LEFT WATCHLIST PANEL ────────────────────────────────────────────── */
+    .sidebar {
+      width: 320px;
+      border-right: 1px solid var(--border);
+      background-color: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    /* Search & Add */
+    .search-box {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .input-group {
+      display: flex;
+      gap: 6px;
+    }
+    .search-input {
+      flex: 1;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text-main);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+    .btn-add {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-add:hover { opacity: 0.9; }
+
+    .search-help {
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    /* Watchlist Scroll Area */
+    .watchlist {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .watchlist::-webkit-scrollbar {
+      width: 4px;
+    }
+    .watchlist::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    /* Watchlist Item Card */
+    .watch-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background-color: transparent;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .watch-item:hover {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+    .watch-item.active {
+      background-color: var(--bg-surface-2);
+      border-color: var(--border-active);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .watch-item::before {
+      content: '';
+      position: absolute; left: 4px; top: 25%; bottom: 25%; width: 3px;
+      background-color: var(--accent);
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .watch-item.active::before {
+      opacity: 1;
+    }
+
+    .item-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0; /* allows text truncation */
+    }
+    .item-symbol-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .item-symbol {
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: -0.2px;
+    }
+    .item-exchange {
+      font-size: 9px;
+      color: var(--text-muted);
+      background-color: rgba(255, 255, 255, 0.05);
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .item-desc {
+      font-size: 10px;
+      color: var(--text-sub);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px;
+    }
+
+    .item-right {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .item-data {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+    .item-price {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .item-change {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .item-change.pos { color: var(--green); }
+    .item-change.neg { color: var(--red); }
+    .item-change.neu { color: var(--text-sub); }
+
+    .btn-delete {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+    .watch-item:hover .btn-delete {
+      opacity: 1;
+    }
+    .btn-delete:hover {
+      color: var(--red);
+      background-color: rgba(244, 63, 94, 0.1);
+    }
+
+    /* Flashing row color updates */
+    .watch-item.flash-up   { animation: bgFlashGreen 0.6s ease-out; }
+    .watch-item.flash-down { animation: bgFlashRed   0.6s ease-out; }
+    @keyframes bgFlashGreen { 0% { background-color: var(--green-glow); } 100% { background-color: transparent; } }
+    @keyframes bgFlashRed   { 0% { background-color: var(--red-glow); } 100% { background-color: transparent; } }
+
+    /* ── RIGHT MAIN DETAIL AREA ──────────────────────────────────────────── */
+    .main-content {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-sub);
+      gap: 10px;
+    }
+    .empty-state-icon {
+      font-size: 40px;
+      opacity: 0.3;
+    }
+
+    /* Selected Details Panel */
+    .details-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    /* Left side of details: Chart and main metrics */
+    .chart-container {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .detail-title-group h2 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .detail-title-group p {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .detail-price-group {
+      text-align: right;
+    }
+    .detail-price {
+      font-size: 24px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      letter-spacing: -0.5px;
+    }
+    .detail-price.up { color: var(--green); }
+    .detail-price.down { color: var(--red); }
+    
+    .detail-change {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+    .detail-change.pos { color: var(--green); }
+    .detail-change.neg { color: var(--red); }
+
+    /* Interactive TradingView Widget Box */
+    .tv-widget-box {
+      height: 380px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Stats Panel */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .stat-card {
+      background-color: var(--bg-surface-2);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Right side of details: Combined Technical Analysis Panel */
+    .ta-panel {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .ta-panel-header {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--text-sub);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    .ta-tf-box {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .ta-tf-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .ta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .ta-row:last-child { margin-bottom: 0; }
+    
+    .ta-name { font-size: 11px; color: var(--text-sub); width: 64px; }
+    
+    .ta-gauge-bg {
+      flex: 1;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 2px;
+      margin: 0 10px;
+      position: relative;
+    }
+    .ta-gauge-center { position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: rgba(255, 255, 255, 0.1); }
+    .ta-gauge-fg {
+      position: absolute; height: 100%; border-radius: 2px; top: 0;
+      transition: width 0.6s ease, left 0.6s ease;
+    }
+    .ta-gauge-fg.buy  { background: var(--green); left: 50%; }
+    .ta-gauge-fg.sell { background: var(--red);   right: 50%; left: auto; }
+    .ta-gauge-fg.neu  { background: var(--text-sub); left: 50%; width: 1px; }
+
+    .ta-badge {
+      font-size: 9px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      min-width: 76px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .ta-badge.STRONG-BUY  { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .ta-badge.BUY         { background: rgba(16, 185, 129, 0.08); color: #86efac; }
+    .ta-badge.NEUTRAL     { background: rgba(148, 163, 184, 0.08); color: var(--text-sub); }
+    .ta-badge.SELL        { background: rgba(244, 63, 94, 0.08);   color: #fca5a5; }
+    .ta-badge.STRONG-SELL { background: rgba(244, 63, 94, 0.15);  color: var(--red); }
+    .ta-badge.NA          { background: rgba(255, 255, 255, 0.03); color: var(--text-muted); }
+
+    /* Skeleton details loader */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.06) 50%, rgba(255, 255, 255, 0.03) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <h1 class="brand-title">Crypto Live Terminal</h1>
+        <p class="brand-subtitle">TradingView API Core</p>
+      </div>
+    </div>
+    <div class="header-info">
+      <div id="ws-status">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="ws-status-text">Disconnected</span>
+      </div>
+      <div id="clock">—</div>
+    </div>
+  </header>
+
+  <!-- CONTAINER -->
+  <div class="container">
+
+    <!-- SIDEBAR: WATCHLIST -->
+    <div class="sidebar">
+      <!-- Search & Add -->
+      <div class="search-box">
+        <div class="input-group">
+          <input type="text" class="search-input" id="search-input" placeholder="BINANCE:BTCUSDT" value="BINANCE:BTCUSDT" />
+          <button class="btn-add" id="btn-add">추가</button>
+        </div>
+        <div class="search-help">
+          예: BINANCE:BTCUSDT, BINANCE:ETHUSDT, KUCOIN:HYPEUSDT
+        </div>
+      </div>
+      <!-- Watchlist Items -->
+      <div class="watchlist" id="watchlist">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- MAIN DETAIL AREA -->
+    <div class="main-content" id="main-content">
+      <!-- Empty state initially -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-state-icon">🖥️</div>
+        <h3>표시할 코인을 선택하세요</h3>
+        <p>왼쪽 감시 목록에서 클릭하거나 새로운 거래소 심볼을 추가해 보세요.</p>
+      </div>
+
+      <!-- Detail Grid (Hidden until item selected) -->
+      <div class="details-grid" id="details-grid" style="display: none;">
+        <!-- Left Pane: Price & Widget -->
+        <div class="chart-container">
+          <div class="detail-header">
+            <div class="detail-title-group">
+              <h2 id="active-symbol">—</h2>
+              <p id="active-desc">—</p>
+            </div>
+            <div class="detail-price-group">
+              <div class="detail-price" id="active-price">$—</div>
+              <div class="detail-change" id="active-change">—</div>
+            </div>
+          </div>
+
+          <!-- Interactive TradingView Embed -->
+          <div class="tv-widget-box" id="tv-widget-box">
+            <!-- Iframe loaded here -->
+          </div>
+
+          <!-- Stats Grid -->
+          <div class="stats-row">
+            <div class="stat-card">
+              <div class="stat-label">24H High</div>
+              <div class="stat-value" id="stat-high">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">24H Low</div>
+              <div class="stat-value" id="stat-low">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">24H Volume</div>
+              <div class="stat-value" id="stat-volume">—</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Exchange</div>
+              <div class="stat-value" id="stat-exchange">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Pane: Multi-Timeframe Technical Analysis -->
+        <div class="ta-panel">
+          <div class="ta-panel-header">Technical Recommendations</div>
+          
+          <!-- 15m TA -->
+          <div class="ta-tf-box">
+            <div class="ta-tf-title">15 Minutes</div>
+            <div class="ta-rows" id="ta-rows-15">
+              <!-- Loaders -->
+            </div>
+          </div>
+
+          <!-- 1h TA -->
+          <div class="ta-tf-box">
+            <div class="ta-tf-title">1 Hour</div>
+            <div class="ta-rows" id="ta-rows-60">
+              <!-- Loaders -->
+            </div>
+          </div>
+
+          <!-- 1D TA -->
+          <div class="ta-tf-box">
+            <div class="ta-tf-title">1 Day</div>
+            <div class="ta-rows" id="ta-rows-1D">
+              <!-- Loaders -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- TradingView Script Library -->
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
+  <script>
+    // ── CONFIG & STATE ────────────────────────────────────────────────────────
+    const DEFAULT_SYMBOLS = [
+      'BINANCE:BTCUSDT',
+      'BINANCE:ETHUSDT',
+      'BINANCE:SOLUSDT',
+      'BINANCE:BNBUSDT',
+      'BINANCE:XRPUSDT',
+      'BINANCE:DOGEUSDT',
+      'BINANCE:ADAUSDT',
+      'BINANCE:AVAXUSDT',
+      'KUCOIN:HYPEUSDT',
+      'BINANCE:LINKUSDT'
+    ];
+
+    let mySymbols = JSON.parse(localStorage.getItem('my_tv_symbols')) || DEFAULT_SYMBOLS;
+    let selectedSymbol = localStorage.getItem('selected_tv_symbol') || '';
+    let marketData = {}; // Stores latest price and TA state for all symbols
+
+    // ── WS Connection ────────────────────────────────────────────────────────
+    const WS_URL = `ws://${location.host}`;
+    let ws;
+
+    function connectWS() {
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        setWSStatus('online', 'Connected');
+        // Subscribe to all my symbols
+        mySymbols.forEach(symbol => {
+          ws.send(JSON.stringify({ type: 'subscribe', symbol }));
+        });
+      };
+
+      ws.onclose = () => {
+        setWSStatus('offline', 'Disconnected');
+        setTimeout(connectWS, 3000);
+      };
+
+      ws.onerror = () => setWSStatus('offline', 'WS Error');
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleWSMessage(msg);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+    }
+
+    function setWSStatus(status, text) {
+      const dot = document.getElementById('status-dot');
+      const textEl = document.getElementById('ws-status-text');
+      dot.className = `status-dot ${status}`;
+      textEl.textContent = text;
+    }
+
+    // ── Message Router ───────────────────────────────────────────────────────
+    function handleWSMessage(msg) {
+      const symbol = msg.symbol;
+      if (!marketData[symbol]) {
+        marketData[symbol] = { price: null, change24h: null, high24h: null, low24h: null, volume: null, description: '', ta: null };
+      }
+
+      if (msg.type === 'price_update') {
+        const item = marketData[symbol];
+        const prevPrice = item.price;
+        Object.assign(item, msg);
+        updateWatchlistItemPrice(symbol, prevPrice);
+        if (symbol === selectedSymbol) {
+          updateDetailsPanel();
+        }
+      }
+
+      if (msg.type === 'ta_update') {
+        marketData[symbol].ta = msg.ta;
+        if (symbol === selectedSymbol) {
+          renderTechnicalAnalysis();
+        }
+      }
+    }
+
+    // ── Watchlist Management ─────────────────────────────────────────────────
+    function renderWatchlist() {
+      const listContainer = document.getElementById('watchlist');
+      listContainer.innerHTML = '';
+
+      mySymbols.forEach((symbol) => {
+        const itemData = marketData[symbol] || { price: null, change24h: null, description: '' };
+        const parts = symbol.split(':');
+        const exchange = parts[0];
+        const ticker = parts[1] || symbol;
+
+        const row = document.createElement('div');
+        row.className = `watch-item ${symbol === selectedSymbol ? 'active' : ''}`;
+        row.id = `watch-${symbol}`;
+        row.onclick = () => selectCoin(symbol);
+
+        const changeVal = itemData.change24h;
+        const changeClass = changeVal > 0 ? 'pos' : changeVal < 0 ? 'neg' : 'neu';
+        const changeText = changeVal !== null ? `${changeVal >= 0 ? '+' : ''}${changeVal.toFixed(2)}%` : '—';
+
+        row.innerHTML = `
+          <div class="item-left">
+            <div class="item-symbol-row">
+              <span class="item-symbol">${ticker}</span>
+              <span class="item-exchange">${exchange}</span>
+            </div>
+            <div class="item-desc" title="${itemData.description || ticker}">${itemData.description || ticker}</div>
+          </div>
+          <div class="item-right">
+            <div class="item-data">
+              <span class="item-price" id="watchprice-${symbol}">${formatPrice(itemData.price)}</span>
+              <span class="item-change ${changeClass}" id="watchchange-${symbol}">${changeText}</span>
+            </div>
+            <button class="btn-delete" onclick="event.stopPropagation(); removeSymbol('${symbol}')">✕</button>
+          </div>
+        `;
+        listContainer.appendChild(row);
+      });
+    }
+
+    function updateWatchlistItemPrice(symbol, prevPrice) {
+      const itemData = marketData[symbol];
+      if (!itemData) return;
+
+      const priceEl = document.getElementById(`watchprice-${symbol}`);
+      const changeEl = document.getElementById(`watchchange-${symbol}`);
+      const cardEl = document.getElementById(`watch-${symbol}`);
+
+      if (priceEl) {
+        priceEl.textContent = formatPrice(itemData.price);
+      }
+
+      if (changeEl) {
+        const changeVal = itemData.change24h;
+        const changeClass = changeVal > 0 ? 'pos' : changeVal < 0 ? 'neg' : 'neu';
+        changeEl.textContent = changeVal !== null ? `${changeVal >= 0 ? '+' : ''}${changeVal.toFixed(2)}%` : '—';
+        changeEl.className = `item-change ${changeClass}`;
+      }
+
+      // Add small neon flash to item card on tick
+      if (cardEl && prevPrice && itemData.price !== prevPrice) {
+        const dir = itemData.price > prevPrice ? 'flash-up' : 'flash-down';
+        cardEl.classList.remove('flash-up', 'flash-down');
+        void cardEl.offsetWidth; // force redraw
+        cardEl.classList.add(dir);
+      }
+    }
+
+    function addSymbol() {
+      const input = document.getElementById('search-input');
+      const symbol = input.value.trim().toUpperCase();
+      if (!symbol) return;
+
+      if (!symbol.includes(':')) {
+        alert('포맷이 맞지 않습니다. EXCHANGE:SYMBOL 형태로 입력해주세요. (예: BINANCE:BTCUSDT)');
+        return;
+      }
+
+      if (mySymbols.includes(symbol)) {
+        alert('이미 감시 목록에 추가된 심볼입니다.');
+        return;
+      }
+
+      mySymbols.push(symbol);
+      localStorage.setItem('my_tv_symbols', JSON.stringify(mySymbols));
+      
+      // Request subscription from server
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'subscribe', symbol }));
+      }
+
+      renderWatchlist();
+      selectCoin(symbol);
+      input.value = '';
+    }
+
+    function removeSymbol(symbol) {
+      mySymbols = mySymbols.filter(s => s !== symbol);
+      localStorage.setItem('my_tv_symbols', JSON.stringify(mySymbols));
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'unsubscribe', symbol }));
+      }
+
+      if (selectedSymbol === symbol) {
+        selectedSymbol = mySymbols[0] || '';
+        localStorage.setItem('selected_tv_symbol', selectedSymbol);
+      }
+
+      renderWatchlist();
+      if (selectedSymbol) {
+        selectCoin(selectedSymbol);
+      } else {
+        document.getElementById('details-grid').style.display = 'none';
+        document.getElementById('empty-state').style.display = 'flex';
+      }
+    }
+
+    // ── Select Coin & Render View ──────────────────────────────────────────
+    function selectCoin(symbol) {
+      if (!symbol) return;
+      selectedSymbol = symbol;
+      localStorage.setItem('selected_tv_symbol', symbol);
+
+      // Active state on watchlist
+      document.querySelectorAll('.watch-item').forEach(el => el.classList.remove('active'));
+      const activeEl = document.getElementById(`watch-${symbol}`);
+      if (activeEl) activeEl.classList.add('active');
+
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('details-grid').style.display = 'grid';
+
+      // Set initial headers
+      const parts = symbol.split(':');
+      const ticker = parts[1] || symbol;
+      document.getElementById('active-symbol').textContent = ticker;
+      document.getElementById('active-desc').textContent = symbol;
+
+      updateDetailsPanel();
+      renderTechnicalAnalysis();
+      loadTradingViewWidget(symbol);
+    }
+
+    function updateDetailsPanel() {
+      const data = marketData[selectedSymbol];
+      if (!data) return;
+
+      const priceEl = document.getElementById('active-price');
+      const changeEl = document.getElementById('active-change');
+      const highEl = document.getElementById('stat-high');
+      const lowEl = document.getElementById('stat-low');
+      const volEl = document.getElementById('stat-volume');
+      const exchEl = document.getElementById('stat-exchange');
+
+      // Price & change
+      if (priceEl && data.price) {
+        const prevText = priceEl.textContent;
+        const curText = '$' + formatPrice(data.price);
+        priceEl.textContent = curText;
+        
+        if (prevText !== '$—' && prevText !== curText) {
+          const isUp = data.price > (data.prevPrice || 0);
+          priceEl.className = `detail-price ${isUp ? 'up' : 'down'}`;
+          setTimeout(() => { priceEl.className = 'detail-price'; }, 1000);
+        }
+      }
+
+      if (changeEl && data.change24h !== null) {
+        changeEl.textContent = `${data.change24h >= 0 ? '+' : ''}${data.change24h.toFixed(2)}% (24H)`;
+        changeEl.className = `detail-change ${data.change24h >= 0 ? 'pos' : 'neg'}`;
+      }
+
+      // Stats card row
+      if (highEl) highEl.textContent = data.high24h ? '$' + formatPrice(data.high24h) : '—';
+      if (lowEl) lowEl.textContent = data.low24h ? '$' + formatPrice(data.low24h) : '—';
+      if (volEl) volEl.textContent = formatVolume(data.volume);
+      if (exchEl) exchEl.textContent = selectedSymbol.split(':')[0];
+      if (data.description) {
+        document.getElementById('active-desc').textContent = data.description;
+      }
+    }
+
+    // ── Embed TradingView Widget ───────────────────────────────────────────
+    function loadTradingViewWidget(symbol) {
+      const parts = symbol.split(':');
+      const exchange = parts[0];
+      const ticker = parts[1];
+
+      // Recreate widget container to avoid iframe duplication
+      const container = document.getElementById('tv-widget-box');
+      container.innerHTML = `<div id="tradingview_widget" style="width:100%; height:100%;"></div>`;
+
+      new TradingView.widget({
+        "autosize": true,
+        "symbol": `${exchange}:${ticker}`,
+        "interval": "60",
+        "timezone": "Asia/Seoul",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#0a0e1a",
+        "enable_publishing": false,
+        "hide_top_toolbar": false,
+        "hide_legend": false,
+        "save_image": false,
+        "container_id": "tradingview_widget"
+      });
+    }
+
+    // ── Render Technical Analysis Rows ─────────────────────────────────────
+    function renderTechnicalAnalysis() {
+      const data = marketData[selectedSymbol];
+      const tfKeys = ['15', '60', '1D'];
+
+      tfKeys.forEach(tf => {
+        const rowsContainer = document.getElementById(`ta-rows-${tf}`);
+        if (!rowsContainer) return;
+
+        if (!data || !data.ta || !data.ta[tf]) {
+          rowsContainer.innerHTML = `
+            ${['Overall', 'MA', 'Osc'].map(n => `
+              <div class="ta-row">
+                <span class="ta-name">${n}</span>
+                <div class="ta-gauge-bg"><div class="ta-gauge-center"></div></div>
+                <span class="ta-badge NA">Loading…</span>
+              </div>
+            `).join('')}
+          `;
+          return;
+        }
+
+        const tfData = data.ta[tf];
+        const items = [
+          { label: 'Overall', val: tfData.overall },
+          { label: 'Mov. Avg', val: tfData.ma },
+          { label: 'Oscillator', val: tfData.osc }
+        ];
+
+        rowsContainer.innerHTML = items.map(({ label, val }) => {
+          const rec = val || { label: 'N/A', score: 0 };
+          const cls = rec.label.replace(/ /g, '-');
+          const score = rec.score;
+          const pct = Math.abs(score) / 2 * 100;
+          const dir = score > 0.1 ? 'buy' : score < -0.1 ? 'sell' : 'neu';
+
+          const barStyle = dir === 'sell'
+            ? `right:50%;width:${pct}%;left:auto;`
+            : dir === 'neu'
+              ? `left:50%;width:1px;`
+              : `left:50%;width:${pct}%;`;
+
+          return `
+            <div class="ta-row">
+              <span class="ta-name">${label}</span>
+              <div class="ta-gauge-bg">
+                <div class="ta-gauge-center"></div>
+                <div class="ta-gauge-fg ${dir}" style="${barStyle}"></div>
+              </div>
+              <span class="ta-badge ${cls}">${rec.label}</span>
+            </div>
+          `;
+        }).join('');
+      });
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    function formatPrice(p) {
+      if (p === null || p === undefined) return '—';
+      if (p >= 1000) return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (p >= 1) return p.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 4 });
+      return p.toFixed(6);
+    }
+
+    function formatVolume(v) {
+      if (!v) return '—';
+      if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+      if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+      if (v >= 1e3) return (v / 1e3).toFixed(2) + 'K';
+      return v.toFixed(2);
+    }
+
+    // UI Clock
+    function updateClock() {
+      const clock = document.getElementById('clock');
+      clock.textContent = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+    }
+
+    // ── Init ────────────────────────────────────────────────────────────────
+    renderWatchlist();
+    connectWS();
+    
+    // Add button handler
+    document.getElementById('btn-add').addEventListener('click', addSymbol);
+    document.getElementById('search-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addSymbol();
+    });
+
+    // Auto-select first symbol on boot
+    if (selectedSymbol && mySymbols.includes(selectedSymbol)) {
+      selectCoin(selectedSymbol);
+    } else if (mySymbols.length > 0) {
+      selectCoin(mySymbols[0]);
+    }
+
+    // Clock Interval
+    setInterval(updateClock, 1000);
+    updateClock();
+
+  </script>
+</body>
+</html>

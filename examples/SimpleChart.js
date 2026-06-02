@@ -8,7 +8,7 @@ const client = new TradingView.Client(); // Creates a websocket client
 
 const chart = new client.Session.Chart(); // Init a Chart session
 
-chart.setMarket('BINANCE:BTCEUR', { // Set the market
+chart.setMarket('BINANCE:BTCUSDT', { // Set the market
   timeframe: 'D',
 });
 
@@ -30,7 +30,7 @@ chart.onUpdate(() => { // When price changes
 // Wait 5 seconds and set the market to BINANCE:ETHEUR
 setTimeout(() => {
   console.log('\nSetting market to BINANCE:ETHEUR...');
-  chart.setMarket('BINANCE:ETHEUR', {
+  chart.setMarket('BINANCE:ETHUSDT', {
     timeframe: 'D',
   });
 }, 5000);
